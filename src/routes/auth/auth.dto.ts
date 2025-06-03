@@ -1,10 +1,13 @@
+import { RefreshToken } from './../../../generated/prisma/index.d'
 import { Exclude, Expose } from 'class-transformer'
-import { IsString } from 'class-validator'
+import { IsString, Length } from 'class-validator'
+import { Match } from 'src/shared/decorators/custom-validator.decorator'
 
 export class LoginBodyDTO {
   @IsString()
   email: string
   @IsString()
+  @Length(6, 20, { message: 'Mật khẩu phải từ 6 đến 20 ký tự' })
   password: string
 }
 
@@ -21,6 +24,7 @@ export class RegisterBodyDTO extends LoginBodyDTO {
   @IsString()
   name: string
   @IsString()
+  @Match('password', { message: 'Mật khẩu không khớp' })
   confirmPassword: string
 }
 
@@ -42,3 +46,10 @@ export class RegisterResDTO {
     Object.assign(this, partial)
   }
 }
+
+export class RefreshTokenBodyDTO {
+  @IsString()
+  refreshToken: string
+}
+
+export class RefreshTokenResDTO extends LoginResDTO {}

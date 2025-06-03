@@ -1,9 +1,9 @@
 import { LoginBodyDTO } from './auth.dto'
 import { PrismaService } from './../../shared/services/prisma.service'
 import { ConflictException, Injectable, UnauthorizedException, UnprocessableEntityException } from '@nestjs/common'
-import { PrismaClientKnownRequestError } from 'generated/prisma/runtime/library'
 import { HasingService } from 'src/shared/services/hasing.service'
 import { TokenService } from 'src/shared/services/token.service'
+import { isNotFoundPrismaError, isUniqueConstraintError } from 'src/shared/helpers'
 
 @Injectable()
 export class AuthService {
@@ -25,7 +25,7 @@ export class AuthService {
       })
       return user
     } catch (error) {
-      if (error instanceof PrismaClientKnownRequestError && error.code === 'P2002') {
+      if (isUniqueConstraintError(error)) {
         throw new ConflictException('Email already exists')
       }
       console.log(error)
@@ -74,5 +74,32 @@ export class AuthService {
     })
 
     return { accessToken, refreshToken }
+  }
+
+  async refreshToken(refreshToken: string) {
+    try {
+      //1. Kiem tra refreshToken hop le hay khong
+      const { userId } = await this.tokenService.verifyRefreshToken(refreshToken)
+
+      //2. Kiem tra refreshToken ton tai trong db khong
+      await this.prismaService.refreshToken.findUniqueOrThrow({
+        where: {
+          token: refreshToken,
+        },
+      })
+
+      //3. Xoas refreshToken cu
+      await this.prismaService.refreshToken.delete({
+        where: {
+          token: refreshToken,
+        },
+      })
+      //4. Tao moi
+      return await this.generateTokens({ userId })
+    } catch (error) {
+      if (isNotFoundPrismaError(error)) {
+        throw new UnauthorizedException('Refresh token has been revoked')
+      }
+    }
   }
 }
